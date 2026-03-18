@@ -1,14 +1,16 @@
-import * as functions from "firebase-functions";
+import { onRequest } from "firebase-functions/v2/https";
+import * as logger from "firebase-functions/logger";
+import { defineString } from "firebase-functions/params";
 import * as admin from "firebase-admin";
 import * as crypto from "crypto";
 
-// Initialize Firebase Admin SDK (uses the default service account automatically
-// when deployed to Firebase Functions — no credential config needed).
-admin.initializeApp({
-  databaseURL: "https://vecsale-6ff3a-default-rtdb.firebaseio.com",
-});
+// Initialize Firebase Admin SDK
+admin.initializeApp();
 
 const db = admin.firestore();
+
+// Define secret parameters for v2
+const paystackSecretKey = defineString("PAYSTACK_SECRET_KEY");
 
 // ─── Helper: Verify Paystack HMAC-SHA512 Signature ──────────────────────────
 function verifyPaystackSignature(
@@ -24,7 +26,9 @@ function verifyPaystackSignature(
 }
 
 // ─── Paystack Webhook Cloud Function ─────────────────────────────────────────
-export const paystackWebhook = functions.https.onRequest(async (req, res) => {
+export const paystackWebhook = onRequest({
+  // Ensure we can access the raw body if needed, although v2 handles it well.
+}, async (req, res) => {
   // Only accept POST
   if (req.method !== "POST") {
     res.status(405).send("Method Not Allowed");
@@ -32,13 +36,10 @@ export const paystackWebhook = functions.https.onRequest(async (req, res) => {
   }
 
   try {
-    // ── 1. Get Paystack secret from Firebase Functions config ──────────────
-    // Set with: firebase functions:config:set paystack.secret_key="sk_test_..."
-    const paystackSecret: string =
-      functions.config().paystack?.secret_key || "";
+    const paystackSecret = paystackSecretKey.value();
 
     if (!paystackSecret) {
-      functions.logger.error("Paystack secret key not configured");
+      logger.error("Paystack secret key not configured");
       res.status(500).send("Payment not configured");
       return;
     }
@@ -46,26 +47,25 @@ export const paystackWebhook = functions.https.onRequest(async (req, res) => {
     // ── 2. Verify Paystack HMAC-SHA512 signature ───────────────────────────
     const signature = req.headers["x-paystack-signature"] as string;
     if (!signature) {
-      functions.logger.warn("Missing x-paystack-signature header");
+      logger.warn("Missing x-paystack-signature header");
       res.status(400).send("No signature");
       return;
     }
 
-    // req.rawBody is available in Firebase Functions (set automatically)
+    // In v2, req.rawBody is often available or req.body is already parsed.
+    // For signature verification, we need the raw body.
     const rawBody = (req as any).rawBody?.toString("utf8") ?? JSON.stringify(req.body);
 
     const isValid = verifyPaystackSignature(rawBody, signature, paystackSecret);
     if (!isValid) {
-      functions.logger.error(
-        "Invalid Paystack signature — possible spoofed request"
-      );
+      logger.error("Invalid Paystack signature — possible spoofed request");
       res.status(400).send("Invalid signature");
       return;
     }
 
     // ── 3. Parse event ─────────────────────────────────────────────────────
     const event = req.body;
-    functions.logger.info("Paystack webhook event received:", event.event);
+    logger.info("Paystack webhook event received:", event.event);
 
     // Only process successful charges
     if (event.event !== "charge.success") {
@@ -79,7 +79,7 @@ export const paystackWebhook = functions.https.onRequest(async (req, res) => {
       amount: number;
     };
 
-    functions.logger.info("Metadata:", JSON.stringify(metadata));
+    logger.info("Metadata:", JSON.stringify(metadata));
 
     // Paystack can nest custom metadata in different ways — handle both
     let deal_id: string | undefined = metadata?.deal_id;
@@ -95,7 +95,7 @@ export const paystackWebhook = functions.https.onRequest(async (req, res) => {
     }
 
     if (!deal_id || !user_id) {
-      functions.logger.error(
+      logger.error(
         "Missing deal_id or user_id in metadata:",
         JSON.stringify(metadata)
       );
@@ -122,7 +122,7 @@ export const paystackWebhook = functions.https.onRequest(async (req, res) => {
     }
 
     const couponRef = await db.collection("coupons").add(couponData);
-    functions.logger.info("Coupon created:", couponRef.id, code);
+    logger.info("Coupon created:", couponRef.id, code);
 
     // ── 6. Save transaction to Firestore ───────────────────────────────────
     const txData: Record<string, any> = {
@@ -141,7 +141,7 @@ export const paystackWebhook = functions.https.onRequest(async (req, res) => {
     }
 
     const txRef = await db.collection("transactions").add(txData);
-    functions.logger.info("Transaction created:", txRef.id);
+    logger.info("Transaction created:", txRef.id);
 
     // ── 7. Increment deal salesCount (atomic) ──────────────────────────────
     try {
@@ -150,11 +150,10 @@ export const paystackWebhook = functions.https.onRequest(async (req, res) => {
         salesCount: admin.firestore.FieldValue.increment(1),
       });
     } catch (salesErr) {
-      // Non-critical — log but don't fail the webhook response
-      functions.logger.warn("Could not increment deal salesCount:", salesErr);
+      logger.warn("Could not increment deal salesCount:", salesErr);
     }
 
-    functions.logger.info("Webhook processed successfully:", {
+    logger.info("Webhook processed successfully:", {
       reference,
       code,
       deal_id,
@@ -163,26 +162,15 @@ export const paystackWebhook = functions.https.onRequest(async (req, res) => {
 
     res.status(200).send("OK");
   } catch (err: any) {
-    functions.logger.error("Webhook error:", err);
+    logger.error("Webhook error:", err);
     res.status(500).send("Server error");
   }
 });
 
 // ─── Initialize Payment Cloud Function ───────────────────────────────────────
-// Verifies a Firebase ID token then creates a Paystack transaction.
-export const initializePayment = functions.https.onRequest(async (req, res) => {
-  // Handle CORS preflight (for local dev)
-  res.set("Access-Control-Allow-Origin", "*");
-  res.set(
-    "Access-Control-Allow-Headers",
-    "Authorization, Content-Type"
-  );
-
-  if (req.method === "OPTIONS") {
-    res.status(204).send("");
-    return;
-  }
-
+export const initializePayment = onRequest({
+  cors: true, // v2 makes CORS easy
+}, async (req, res) => {
   if (req.method !== "POST") {
     res.status(405).json({ error: "Method Not Allowed" });
     return;
@@ -202,7 +190,7 @@ export const initializePayment = functions.https.onRequest(async (req, res) => {
     try {
       decodedToken = await admin.auth().verifyIdToken(idToken);
     } catch (authErr: any) {
-      functions.logger.error("Token verification failed:", authErr.message);
+      logger.error("Token verification failed:", authErr.message);
       res.status(401).json({ error: "Unauthorized — invalid Firebase token" });
       return;
     }
@@ -223,8 +211,7 @@ export const initializePayment = functions.https.onRequest(async (req, res) => {
     }
 
     // ── 3. Get Paystack secret ─────────────────────────────────────────────
-    const paystackSecret: string =
-      functions.config().paystack?.secret_key || "";
+    const paystackSecret = paystackSecretKey.value();
 
     if (!paystackSecret) {
       res.status(500).json({ error: "Payment not configured" });
@@ -286,14 +273,14 @@ export const initializePayment = functions.https.onRequest(async (req, res) => {
     const paystackData = await paystackRes.json() as any;
 
     if (!paystackData.status) {
-      functions.logger.error("Paystack init error:", paystackData);
+      logger.error("Paystack init error:", paystackData);
       res
         .status(400)
         .json({ error: paystackData.message || "Payment initialization failed" });
       return;
     }
 
-    functions.logger.info("Payment initialized:", {
+    logger.info("Payment initialized:", {
       reference: paystackData.data.reference,
       deal_id,
       uid,
@@ -304,7 +291,7 @@ export const initializePayment = functions.https.onRequest(async (req, res) => {
       reference: paystackData.data.reference,
     });
   } catch (err: any) {
-    functions.logger.error("initializePayment error:", err);
+    logger.error("initializePayment error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });

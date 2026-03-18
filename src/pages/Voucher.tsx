@@ -8,7 +8,8 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
@@ -29,12 +30,39 @@ const Voucher = () => {
     queryKey: ["voucher", id],
     enabled: !!id && !!user,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("coupons")
-        .select("*, deals:deal_id(title, image_url, discounted_price, original_price, location, expiry_date, description, businesses(name, location, phone, email, logo))")
-        .eq("id", id!)
-        .maybeSingle();
-      if (error) throw error;
+      const docRef = doc(db, "coupons", id!);
+      const docSnap = await getDoc(docRef);
+      if (!docSnap.exists()) return null;
+
+      const data = { id: docSnap.id, ...docSnap.data() } as any;
+
+      if (data.dealId) {
+        const dealRef = doc(db, "deals", data.dealId);
+        const dealSnap = await getDoc(dealRef);
+        if (dealSnap.exists()) {
+          const dealData = dealSnap.data();
+          data.deals = {
+            ...dealData,
+            title: dealData.title,
+            image_url: dealData.image_url,
+            discounted_price: dealData.discounted_price,
+            original_price: dealData.original_price,
+            location: dealData.location,
+            expiry_date: dealData.expiry_date,
+            description: dealData.description,
+          };
+
+          // Resolve merchant
+          const merchantId = dealData.business_id || dealData.merchant_id;
+          if (merchantId) {
+            const merchantRef = doc(db, "merchants", merchantId);
+            const merchantSnap = await getDoc(merchantRef);
+            if (merchantSnap.exists()) {
+              data.deals.businesses = merchantSnap.data();
+            }
+          }
+        }
+      }
       return data;
     },
   });

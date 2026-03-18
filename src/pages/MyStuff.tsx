@@ -4,7 +4,8 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { collection, query, where, getDocs, orderBy, deleteDoc, doc, getDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 
@@ -17,20 +18,52 @@ const MyStuff = () => {
     queryKey: ["my-coupons", user?.uid],
     enabled: !!user,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("coupons")
-        .select("*, deals:deal_id(title, image_url, discounted_price, location, businesses(name))")
-        .eq("user_id", user!.uid)
-        .order("purchase_date", { ascending: false });
-      if (error) throw error;
-      return data || [];
+      const q = query(
+        collection(db, "coupons"),
+        where("userId", "==", user!.uid),
+        orderBy("createdAt", "desc")
+      );
+      const snapshot = await getDocs(q);
+      
+      const couponsData = await Promise.all(
+        snapshot.docs.map(async (docSnap) => {
+          const coupon = { id: docSnap.id, ...docSnap.data() } as any;
+          
+          if (coupon.dealId) {
+            const dealRef = doc(db, "deals", coupon.dealId);
+            const dealSnap = await getDoc(dealRef);
+            if (dealSnap.exists()) {
+              const dealData = dealSnap.data();
+              // Try to find the merchant name
+              let merchantName = "Local Merchant";
+              if (dealData.business_id || dealData.merchant_id) {
+                const merchantRef = doc(db, "merchants", dealData.business_id || dealData.merchant_id);
+                const merchantSnap = await getDoc(merchantRef);
+                if (merchantSnap.exists()) {
+                  merchantName = merchantSnap.data().name;
+                }
+              }
+
+              coupon.deals = {
+                title: dealData.title,
+                image_url: dealData.image_url,
+                discounted_price: dealData.discounted_price,
+                location: dealData.location,
+                businesses: { name: merchantName }
+              };
+            }
+          }
+          return coupon;
+        })
+      );
+      
+      return couponsData;
     },
   });
 
   const deleteCoupon = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("coupons").delete().eq("id", id);
-      if (error) throw error;
+      await deleteDoc(doc(db, "coupons", id));
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["my-coupons"] });
