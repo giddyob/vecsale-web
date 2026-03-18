@@ -171,8 +171,10 @@ export const paystackWebhook = onRequest({
 export const initializePayment = onRequest({
   cors: true, // v2 makes CORS easy
 }, async (req, res) => {
+  logger.info("initializePayment hit", { method: req.method, headers: req.headers });
+
   if (req.method !== "POST") {
-    res.status(405).json({ error: "Method Not Allowed" });
+    res.status(405).send("Method Not Allowed");
     return;
   }
 
@@ -180,18 +182,18 @@ export const initializePayment = onRequest({
     // ── 1. Verify Firebase ID token ────────────────────────────────────────
     const authHeader = req.headers.authorization;
     if (!authHeader?.startsWith("Bearer ")) {
+      logger.warn("Missing or malformed Authorization header");
       res.status(401).json({ error: "Unauthorized — missing Firebase ID token" });
       return;
     }
 
     const idToken = authHeader.replace("Bearer ", "").trim();
-    let decodedToken: admin.auth.DecodedIdToken;
-
+    let decodedToken;
     try {
       decodedToken = await admin.auth().verifyIdToken(idToken);
     } catch (authErr: any) {
       logger.error("Token verification failed:", authErr.message);
-      res.status(401).json({ error: "Unauthorized — invalid Firebase token" });
+      res.status(401).json({ error: `Unauthorized — invalid Firebase token: ${authErr.message}` });
       return;
     }
 
