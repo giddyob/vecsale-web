@@ -11,6 +11,8 @@ const Favourites = () => {
   const { user } = useAuth();
   const { data: favData = [], isLoading } = useFavoriteDeals();
 
+  // useFavoriteDeals returns [{ deal_id, deals: rawDealObject }]
+  // The deals object already has merchants populated — use mapDeal to build DealWithBusiness
   const deals: DealWithBusiness[] = favData
     .filter((f: any) => f.deals)
     .map((f: any) => {
@@ -19,15 +21,16 @@ const Favourites = () => {
         id: d.id,
         title: d.title,
         image: d.image_url || "/placeholder.svg",
-        merchant: d.businesses?.name || "Local Merchant",
-        location: d.location || "",
-        rating: d.businesses?.rating || 4.5,
+        merchant: d.merchants?.name || "Local Merchant",
+        location: d.merchants?.location || d.location || "",
+        rating: d.merchants?.rating || 4.5,
         currentPrice: Number(d.discounted_price),
         originalPrice: Number(d.original_price),
         discount: d.discount_percentage,
         category: d.category,
         description: d.description,
-        businessId: d.business_id,
+        businessId: d.merchants?.id || d.business_id || null,
+        avatarUrl: d.merchants?.avatarUrl || d.merchants?.logo || null,
         galleryUrls: [],
         subDeals: [],
       };

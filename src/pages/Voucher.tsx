@@ -121,7 +121,7 @@ const Voucher = () => {
   }
 
   const deal = coupon.deals as any;
-  const business = deal?.businesses;
+  const merchant = deal?.merchants || deal?.businesses;
   const st = (coupon.status || "UNUSED") as keyof typeof statusConfig;
   const { label, icon: Icon, variant } = statusConfig[st] || statusConfig.UNUSED;
 
@@ -182,31 +182,31 @@ const Voucher = () => {
             <div className="border-t-2 border-dashed border-border" />
 
             {/* Merchant Details */}
-            {business && (
+            {merchant && (
               <div className="space-y-2">
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Merchant</p>
                 <div className="flex items-center gap-3">
-                  {business.logo ? (
-                    <img src={business.logo} alt={business.name} className="w-10 h-10 rounded-full object-cover border border-border" />
+                  {merchant.logo ? (
+                    <img src={merchant.logo} alt={merchant.name} className="w-10 h-10 rounded-full object-cover border border-border" />
                   ) : (
                     <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center">
                       <Store className="w-5 h-5 text-muted-foreground" />
                     </div>
                   )}
                   <div>
-                    <p className="text-sm font-semibold text-foreground">{business.name}</p>
-                    {(business.location || deal?.location) && (
+                    <p className="text-sm font-semibold text-foreground">{merchant.name}</p>
+                    {(merchant.location || deal?.location) && (
                       <p className="text-xs text-muted-foreground flex items-center gap-1">
-                        <MapPin className="w-3 h-3" /> {business.location || deal.location}
+                        <MapPin className="w-3 h-3" /> {merchant.location || deal.location}
                       </p>
                     )}
                   </div>
                 </div>
-                {business.phone && (
-                  <p className="text-xs text-muted-foreground">📞 {business.phone}</p>
+                {merchant.phone && (
+                  <p className="text-xs text-muted-foreground">📞 {merchant.phone}</p>
                 )}
-                {business.email && (
-                  <p className="text-xs text-muted-foreground">✉️ {business.email}</p>
+                {merchant.email && (
+                  <p className="text-xs text-muted-foreground">✉️ {merchant.email}</p>
                 )}
               </div>
             )}

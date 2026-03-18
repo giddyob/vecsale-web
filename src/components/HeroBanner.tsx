@@ -8,18 +8,18 @@ const HeroBanner = () => {
         alt="Lifestyle banner"
         className="absolute inset-0 w-full h-full object-cover" />
 
-      <div className="absolute inset-0 bg-primary/70" />
+      <div className="absolute inset-0 bg-black/50" />
       <div className="relative container h-full flex flex-col justify-center">
-        <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-accent-foreground bg-accent/20 border border-accent/30 rounded-full px-3 py-1 w-fit mb-3"> Exclusives
+        <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-white/20 border border-white/30 rounded-full px-3 py-1 w-fit mb-3"> Exclusives
 
         </span>
-        <h1 className="text-3xl md:text-4xl font-display font-extrabold text-primary-foreground leading-tight">
+        <h1 className="text-3xl md:text-4xl font-display font-extrabold text-white leading-tight">
           Unlock the{" "}
-          <span className="text-gradient-accent">Extraordinary.</span>
+          <span>Extraordinary.</span>
         </h1>
         <a
           href="#deals"
-          className="mt-4 inline-flex items-center px-5 py-2 text-sm font-semibold bg-accent text-accent-foreground rounded-lg hover:opacity-90 transition-opacity w-fit">
+          className="mt-4 inline-flex items-center px-5 py-2 text-sm font-semibold bg-white text-black rounded-lg hover:bg-slate-100 transition-colors w-fit">
 
           Hot Deals
         </a>

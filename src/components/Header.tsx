@@ -67,7 +67,7 @@ const AccountDropdown = ({
             <p className="text-xs text-muted-foreground">Logged in as</p>
             <p
               className="text-sm font-bold mt-0.5"
-              style={{ color: "hsl(120 60% 41%)" }}
+              style={{ color: "#F35F20" }}
             >
               {initials}
             </p>
@@ -147,9 +147,9 @@ const Header = () => {
                 <SheetHeader className="p-4 border-b border-border">
                   <SheetTitle className="text-left">
                     <img
-                      src={vecsaleLogo}
+                      src={vecsaleLogoDesktop}
                       alt="VecSale"
-                      style={{ height: 32, width: "auto" }}
+                      style={{ width: 168.06, height: 40 }}
                     />
                   </SheetTitle>
                 </SheetHeader>
@@ -220,11 +220,11 @@ const Header = () => {
             </Sheet>
 
             <a href="/" className="flex-shrink-0">
-              <img alt="VecSale" className="hidden md:block" style={{ height: 40, width: "auto" }} src={vecsaleLogoDesktop} />
+              <img alt="VecSale" className="hidden md:block" style={{ width: 168.06, height: 40 }} src={vecsaleLogoDesktop} />
               <img
                 alt="VecSale"
                 className="md:hidden"
-                style={{ height: 32, width: "auto" }}
+                style={{ width: 50, height: 32 }}
                 src={vecsaleLogo}
               />
             </a>

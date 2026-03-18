@@ -14,13 +14,13 @@ const MyStuff = () => {
   const navigate = useNavigate();
 
   const { data: coupons = [], isLoading } = useQuery({
-    queryKey: ["my-coupons", user?.id],
+    queryKey: ["my-coupons", user?.uid],
     enabled: !!user,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("coupons")
         .select("*, deals:deal_id(title, image_url, discounted_price, location, businesses(name))")
-        .eq("user_id", user!.id)
+        .eq("user_id", user!.uid)
         .order("purchase_date", { ascending: false });
       if (error) throw error;
       return data || [];
@@ -115,7 +115,7 @@ const MyStuff = () => {
                     </div>
 
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      {deal?.businesses?.name} · {deal?.location}
+                      {deal?.merchants?.name || deal?.businesses?.name} · {deal?.location}
                     </p>
                     <p className="text-xs text-muted-foreground">Code: {coupon.code}</p>
 

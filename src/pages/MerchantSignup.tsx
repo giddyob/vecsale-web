@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { doc, setDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
@@ -98,20 +99,19 @@ const MerchantSignup = () => {
     setIsSubmitting(true);
 
     try {
-      // For now, store in businesses table with a "pending" status via description
+      // Store in merchants collection with a "pending" status
       // Admin will review and approve
-      const { error } = await supabase.from("businesses").insert({
-        id: crypto.randomUUID(),
+      const newId = crypto.randomUUID();
+      await setDoc(doc(db, "merchants", newId), {
+        id: newId,
         name: form.businessName,
         location: form.businessAddress,
         email: form.email,
         phone: form.phone,
         category: form.category,
         description: `PENDING APPROVAL | Contact: ${form.contactName} | Website: ${form.website || "N/A"}`,
-        owner_id: user?.id || null,
+        owner_id: user?.uid || null,
       });
-
-      if (error) throw error;
 
       setSubmitted(true);
       toast({

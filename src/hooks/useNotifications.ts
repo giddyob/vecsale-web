@@ -1,6 +1,7 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { useCallback, useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { collection, query, getDocs, doc, getDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { useCallback, useState } from "react";
 
 export interface DealNotification {
     id: string;
@@ -43,15 +44,72 @@ export function useNotifications() {
         queryFn: async () => {
             const since = new Date();
             since.setDate(since.getDate() - 30);
-            const { data, error } = await supabase
-                .from("deals")
-                .select("id, title, image_url, category, discounted_price, discount_percentage, created_at, businesses(name)")
-                .eq("status", "active")
-                .gte("created_at", since.toISOString())
-                .order("created_at", { ascending: false })
-                .limit(30);
-            if (error) throw error;
-            return data || [];
+            const sinceIso = since.toISOString();
+
+            // Fetch all deals; filter + sort client-side to avoid composite index requirement
+            const q = query(collection(db, "deals"));
+            const querySnapshot = await getDocs(q);
+
+            const activeDocs = querySnapshot.docs.filter(d => {
+                const data = d.data();
+                const status = data.status;
+                const createdAt = data.created_at || "";
+                const isActive = !status || status === "active";
+                const isRecent = !createdAt || createdAt >= sinceIso;
+                return isActive && isRecent;
+            }).slice(0, 30); // limit 30
+
+            // Pre-fetch merchants to build name map for fallback lookup
+            const merchantsSnap = await getDocs(collection(db, "merchants"));
+            const merchantNameMap: Record<string, any> = {};
+            merchantsSnap.forEach((docSnap) => {
+                const d = docSnap.data();
+                if (d.name) merchantNameMap[d.name.toLowerCase().trim()] = d;
+            });
+
+            const dealsPromises = activeDocs.map(async (docSnap) => {
+                const dealData = docSnap.data();
+                let businessData = null;
+
+                const getStrId = (val: any) => typeof val === "string" ? val : val?.id || val?.path?.split('/')?.pop();
+                
+                let refId = getStrId(dealData.merchantId) ||
+                            getStrId(dealData.merchants) || 
+                            getStrId(dealData.merchant_id) || 
+                            getStrId(dealData.merchants_id) || 
+                            getStrId(dealData.business_id) ||
+                            getStrId(dealData.businesses);
+
+                if (!refId && typeof dealData.merchant === "string") {
+                    if (!dealData.merchant.includes(" ") && dealData.merchant.length >= 8) {
+                        refId = dealData.merchant;
+                    }
+                }
+
+                if (refId) {
+                    const merchantRef = doc(db, "merchants", refId);
+                    const merchantSnap = await getDoc(merchantRef);
+                    if (merchantSnap.exists()) {
+                        businessData = merchantSnap.data();
+                    }
+                }
+
+                // Fallback: match by merchant name
+                if (!businessData) {
+                    const merchantName = dealData.merchant || dealData.merchants?.name || dealData.businesses?.name;
+                    if (merchantName && typeof merchantName === "string") {
+                        businessData = merchantNameMap[merchantName.toLowerCase().trim()] || null;
+                    }
+                }
+
+                return {
+                    id: docSnap.id,
+                    ...dealData,
+                    merchants: businessData ? { name: businessData.name } : (dealData.merchants || dealData.businesses || null)
+                };
+            });
+
+            return await Promise.all(dealsPromises);
         },
         refetchInterval: 60_000, // refresh every minute
         staleTime: 30_000,
@@ -63,7 +121,7 @@ export function useNotifications() {
             id: d.id,
             dealId: d.id,
             title: d.title,
-            merchant: d.businesses?.name || "Local Merchant",
+            merchant: d.merchants?.name || "Local Merchant",
             imageUrl: d.image_url || "/placeholder.svg",
             category: d.category || "",
             discountedPrice: Number(d.discounted_price),

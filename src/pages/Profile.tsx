@@ -7,7 +7,8 @@ import {
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
+import { updateProfile } from "firebase/auth";
+import { auth } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
 
 function getInitials(email: string, fullName?: string) {
@@ -28,7 +29,7 @@ const Profile = () => {
     const { toast } = useToast();
     const navigate = useNavigate();
 
-    const currentName: string = user?.user_metadata?.full_name || "";
+    const currentName: string = user?.displayName || "";
     const [editingName, setEditingName] = useState(false);
     const [nameInput, setNameInput] = useState(currentName);
     const [savingName, setSavingName] = useState(false);
@@ -39,21 +40,23 @@ const Profile = () => {
     }
 
     const initials = getInitials(user.email || "", currentName);
-    const joinedDate = new Date(user.created_at).toLocaleDateString("en-GB", {
+    const joinedDate = user.metadata.creationTime ? new Date(user.metadata.creationTime).toLocaleDateString("en-GB", {
         day: "numeric", month: "long", year: "numeric",
-    });
+    }) : "Recently";
 
     const handleSaveName = async () => {
         if (!nameInput.trim()) return;
         setSavingName(true);
-        const { error } = await supabase.auth.updateUser({
-            data: { full_name: nameInput.trim() },
-        });
-        if (error) {
-            toast({ title: "Update failed", description: error.message, variant: "destructive" });
-        } else {
-            toast({ title: "Display name updated!" });
-            setEditingName(false);
+        if (auth.currentUser) {
+           try {
+              await updateProfile(auth.currentUser, {
+                 displayName: nameInput.trim()
+              });
+              toast({ title: "Display name updated!" });
+              setEditingName(false);
+           } catch (error: any) {
+              toast({ title: "Update failed", description: error.message, variant: "destructive" });
+           }
         }
         setSavingName(false);
     };

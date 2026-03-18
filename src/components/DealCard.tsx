@@ -1,6 +1,7 @@
 import { Heart, Star, MapPin } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import type { DealWithBusiness } from "@/hooks/useDeals";
+import { useMerchants } from "@/hooks/useDeals";
 import { useFavorites, useToggleFavorite } from "@/hooks/useFavorites";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -15,6 +16,23 @@ const DealCard = ({ deal, variant = "default" }: DealCardProps) => {
   const { data: favIds = [] } = useFavorites();
   const toggleFav = useToggleFavorite();
   const isFav = favIds.includes(deal.id);
+
+  // Fetch all merchants from Firestore so we can link by name even if deal.businessId is null
+  const { data: merchantsMap } = useMerchants();
+
+  // Resolve the merchant's Firestore doc ID:
+  // 1. Use deal.businessId set by enrichDealsWithBusiness (most reliable)
+  // 2. Fall back to a name-based lookup in the merchants map
+  const resolvedMerchantId =
+    deal.businessId ||
+    (merchantsMap?.byName[deal.merchant?.toLowerCase()] ?? null);
+
+  // Get full merchant profile to show logo/avatar
+  const merchantProfile = resolvedMerchantId
+    ? merchantsMap?.byId[resolvedMerchantId]
+    : null;
+
+  const avatarUrl = deal.avatarUrl || merchantProfile?.avatarUrl || merchantProfile?.logo || null;
 
   const handleFav = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -45,28 +63,50 @@ const DealCard = ({ deal, variant = "default" }: DealCardProps) => {
       </div>
 
       <div className="p-4">
-        <div className="flex items-center gap-2 text-sm mb-2">
-          {deal.businessId ? (
-            <span
-              onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.location.href = `/business/${deal.businessId}`; }}
-              className="font-semibold text-accent uppercase tracking-wide truncate cursor-pointer hover:underline"
-            >
-              {deal.merchant}
-            </span>
+        {/* Merchant row */}
+        <div className="flex items-center gap-2 mb-2">
+          {/* Merchant avatar */}
+          {avatarUrl ? (
+            <img
+              src={avatarUrl}
+              alt={deal.merchant}
+              className="w-6 h-6 rounded-full object-cover border border-border bg-white flex-shrink-0"
+            />
           ) : (
-            <span className="font-semibold text-accent uppercase tracking-wide truncate">
+            <div className="w-6 h-6 rounded-full bg-accent/15 flex items-center justify-center flex-shrink-0 text-[10px] font-bold text-accent uppercase">
+              {deal.merchant?.charAt(0) || "M"}
+            </div>
+          )}
+
+          {/* Merchant name — always a link if we can resolve an ID */}
+          {resolvedMerchantId ? (
+            <Link
+              to={`/business/${resolvedMerchantId}`}
+              onClick={(e) => e.stopPropagation()}
+              className="text-sm font-semibold text-accent uppercase tracking-wide truncate hover:underline"
+            >
+              {merchantProfile?.name || deal.merchant}
+            </Link>
+          ) : (
+            <span className="text-sm font-semibold text-accent uppercase tracking-wide truncate">
               {deal.merchant}
             </span>
           )}
-          <span className="flex items-center gap-0.5 text-muted-foreground">
-            <MapPin className="w-3.5 h-3.5" />
-            {deal.location}
-          </span>
-          <span className="flex items-center gap-0.5 text-foreground ml-auto">
+
+          {/* Rating pushed to right */}
+          <span className="flex items-center gap-0.5 text-foreground ml-auto text-xs flex-shrink-0">
             <Star className="w-3.5 h-3.5 fill-accent text-accent" />
-            {deal.rating}
+            {merchantProfile?.rating ?? deal.rating}
           </span>
         </div>
+
+        {/* Location */}
+        {(deal.location || merchantProfile?.location) && (
+          <div className="flex items-center gap-1 text-xs text-muted-foreground mb-2">
+            <MapPin className="w-3 h-3" />
+            <span className="truncate">{deal.location || merchantProfile?.location}</span>
+          </div>
+        )}
 
         <h3 className="font-display font-semibold text-base text-foreground leading-tight mb-3 line-clamp-2">
           {deal.title}

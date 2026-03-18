@@ -62,8 +62,8 @@ const NotificationDropdown = () => {
             {/* Dropdown panel */}
             {open && (
                 <div
-                    className="absolute right-0 mt-3 bg-white rounded-xl shadow-2xl border border-border z-50 flex flex-col"
-                    style={{ width: 360, maxHeight: 520 }}
+                    className="fixed left-0 right-0 top-[106px] md:absolute md:top-auto md:left-auto md:right-0 md:w-[360px] md:mt-3 md:rounded-xl bg-white shadow-2xl border border-border z-50 flex flex-col"
+                    style={{ maxHeight: 520 }}
                 >
                     {/* Header */}
                     <div className="flex items-center justify-between px-4 py-3 border-b border-border flex-shrink-0">
@@ -160,7 +160,7 @@ const NotificationDropdown = () => {
                                     <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
                                         <button
                                             onClick={() => dismiss(n.id)}
-                                            className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
+                                            className="opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
                                             aria-label="Dismiss"
                                         >
                                             <X className="w-3.5 h-3.5" />

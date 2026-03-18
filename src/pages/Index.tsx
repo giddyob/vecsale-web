@@ -7,7 +7,9 @@ import Footer from "@/components/Footer";
 import { useDeals } from "@/hooks/useDeals";
 
 const Index = () => {
-  const { data: deals = [], isLoading } = useDeals();
+  const { data: deals = [], isLoading, isError, error } = useDeals();
+
+  if (error) console.error("[useDeals] Firebase error:", error);
 
   const trending = deals.slice(0, 7);
   const handpicked = deals.slice(7, 11);
@@ -19,6 +21,10 @@ const Index = () => {
       <HeroBanner />
       {isLoading ? (
         <div className="container py-20 text-center text-muted-foreground">Loading deals...</div>
+      ) : isError ? (
+        <div className="container py-20 text-center text-red-500">
+          Failed to load deals. Please check your connection and try again.
+        </div>
       ) : (
         <>
           <TrendingSection deals={trending} />
