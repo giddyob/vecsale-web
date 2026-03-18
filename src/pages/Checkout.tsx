@@ -6,7 +6,7 @@ import { useDeal } from "@/hooks/useDeals";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCart } from "@/contexts/CartContext";
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { auth } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
 
 const Checkout = () => {
@@ -122,17 +122,20 @@ const Checkout = () => {
       const activeSub = subId ? deal.subDeals.find((s) => s.id === subId) : null;
       const amount = activeSub ? activeSub.discounted_price : deal.currentPrice;
 
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData?.session?.access_token;
+      // Get the Firebase ID token for the currently signed-in user
+      const firebaseUser = auth.currentUser;
+      if (!firebaseUser) {
+        throw new Error("No authenticated Firebase user found. Please sign in again.");
+      }
+      const idToken = await firebaseUser.getIdToken();
 
       const res = await fetch(
-        `https://uihnsmmcgiszhuzzqroi.supabase.co/functions/v1/initialize-payment`,
+        `https://us-central1-vecsale-6ff3a.cloudfunctions.net/initializePayment`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            Authorization: `Bearer ${idToken}`,
           },
           body: JSON.stringify({
             deal_id: deal.id,
@@ -148,7 +151,7 @@ const Checkout = () => {
         throw new Error(data.error || "Payment initialization failed");
       }
 
-      // Redirect to Paystack checkout
+      // Redirect to Paystack's hosted checkout page
       window.location.href = data.authorization_url;
     } catch (err: any) {
       console.error("Payment error:", err);
