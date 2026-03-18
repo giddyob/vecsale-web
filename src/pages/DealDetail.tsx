@@ -159,6 +159,25 @@ const DealDetail = () => {
                 {activeSub?.description || deal.description || `Enjoy an incredible experience with ${deal.merchant}. This exclusive deal gives you ${displayDiscount}% off the regular price.`}
               </p>
 
+              {/* Redemption Rules - displayed if available */}
+              {(activeSub?.redemption_rules || deal.redemption_rules) && (
+                <div className="mb-8">
+                  <h3 className="text-lg font-bold text-foreground mb-3">Redemption Rules</h3>
+                  <div className="bg-secondary/30 border border-border rounded-xl p-5">
+                    <ul className="text-sm text-muted-foreground space-y-2 list-disc list-inside marker:text-accent">
+                      {(activeSub?.redemption_rules || deal.redemption_rules)
+                        ?.split('\n')
+                        .filter(rule => rule.trim().length > 0)
+                        .map((rule, idx) => (
+                          <li key={idx} className="leading-relaxed">
+                            {rule.replace(/^- /, '').trim()}
+                          </li>
+                        ))}
+                    </ul>
+                  </div>
+                </div>
+              )}
+
               {/* Business Info Row */}
               <div className="flex items-center gap-3 p-4 bg-secondary/50 border border-border rounded-xl">
                 {/* Logo / avatar */}
@@ -207,7 +226,7 @@ const DealDetail = () => {
                 </div>
 
                 {resolvedMerchantId && (
-                  <Link
+                   <Link
                     to={`/business/${resolvedMerchantId}`}
                     className="flex-shrink-0 text-sm font-semibold text-accent border border-accent/40 rounded-lg px-4 py-2 hover:bg-accent hover:text-accent-foreground transition-colors hidden sm:block"
                   >

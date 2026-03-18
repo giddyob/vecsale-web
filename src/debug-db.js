@@ -12,13 +12,7 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 
-async function main() {
-  try {
-    const cred = await signInAnonymously(auth);
-    console.log("Signed in anonymously", cred.user.uid);
-  } catch(e) {
-    console.log("Failed to sign in anonymously", e.message);
-  }
+  console.log("Not signing in...");
 
   try {
     console.log("Fetching merchants...");
@@ -36,7 +30,4 @@ async function main() {
     console.error("error fetching deals", e.message);
   }
   
-  process.exit(0);
-}
 
-main().catch(console.error);

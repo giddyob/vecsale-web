@@ -30,6 +30,7 @@ export interface DealWithBusiness {
   avatarUrl: string | null;
   subDeals: SubDeal[];
   galleryUrls: string[];
+  redemption_rules?: string;
 }
 
 function parseSubDeals(raw: any): SubDeal[] {
@@ -86,6 +87,7 @@ export function mapDeal(deal: any, businessOverrides?: any): DealWithBusiness {
     avatarUrl: avatar,
     subDeals: parseSubDeals(deal.subDeals || deal.sub_options),
     galleryUrls: parseGalleryUrls(deal.image_urls || deal.gallery_urls),
+    redemption_rules: deal.redemption_rules,
   };
 }
 
