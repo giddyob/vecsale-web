@@ -215,13 +215,13 @@ const Checkout = () => {
                     </div>
                     <div className="border-t border-border pt-3 space-y-2 text-sm">
                       <div className="flex justify-between text-muted-foreground">
-                        <span>Subtotal</span><span>GH₵{displayOriginal}</span>
+                        <span>Subtotal</span><span className="font-bold text-primary">GH₵{displayOriginal}</span>
                       </div>
                       <div className="flex justify-between text-accent font-semibold">
-                        <span>Discount (-{displayDiscount}%)</span><span>-GH₵{displayOriginal - displayPrice}</span>
+                        <span>Discount (-{displayDiscount}%)</span><span className="text-[#E65100] font-bold">-GH₵{displayOriginal - displayPrice}</span>
                       </div>
                       <div className="flex justify-between font-bold text-foreground text-base pt-2 border-t border-border">
-                        <span>Total</span><span>GH₵{displayPrice}</span>
+                        <span>Total</span><span className="text-primary">GH₵{displayPrice}</span>
                       </div>
                     </div>
                   </div>

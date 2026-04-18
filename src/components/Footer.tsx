@@ -2,7 +2,7 @@ import vecsaleLogoDesktop from "@/assets/vecsale-logo.png";
 
 const Footer = () => {
   return (
-    <footer className="bg-nav py-10 mt-8">
+    <footer className="bg-nav pt-4 pb-10 mt-8">
       <div className="container">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
           <div>

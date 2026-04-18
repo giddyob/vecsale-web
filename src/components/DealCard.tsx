@@ -7,11 +7,12 @@ import { useAuth } from "@/contexts/AuthContext";
 
 interface DealCardProps {
   deal: DealWithBusiness;
-  variant?: "default" | "large";
+  variant?: "default" | "large" | "trending";
 }
 
 const DealCard = ({ deal, variant = "default" }: DealCardProps) => {
   const isLarge = variant === "large";
+  const isTrending = variant === "trending";
   const { user } = useAuth();
   const { data: favIds = [] } = useFavorites();
   const toggleFav = useToggleFavorite();
@@ -47,11 +48,15 @@ const DealCard = ({ deal, variant = "default" }: DealCardProps) => {
       className="group block bg-card rounded-lg overflow-hidden transition-shadow duration-300 hover:shadow-[var(--shadow-card-hover)]"
       style={{ boxShadow: "var(--shadow-card)" }}
     >
-      <div className={`relative overflow-hidden ${isLarge ? "h-56" : "h-44"}`}>
+      <div 
+        className={`relative overflow-hidden ${isLarge ? "h-56" : isTrending ? "flex justify-center" : "h-44"}`}
+        style={isTrending ? { height: "150.19px" } : {}}
+      >
         <img
           src={deal.image}
           alt={deal.title}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+          className={`object-cover group-hover:scale-105 transition-transform duration-500 ${isTrending ? "" : "w-full h-full"}`}
+          style={isTrending ? { width: "267px", height: "150.19px" } : {}}
           loading="lazy"
         />
         <button
@@ -64,31 +69,19 @@ const DealCard = ({ deal, variant = "default" }: DealCardProps) => {
 
       <div className="p-4">
         {/* Merchant row */}
+        {/* Merchant row */}
         <div className="flex items-center gap-2 mb-2">
-          {/* Merchant avatar */}
-          {avatarUrl ? (
-            <img
-              src={avatarUrl}
-              alt={deal.merchant}
-              className="w-6 h-6 rounded-full object-cover border border-border bg-white flex-shrink-0"
-            />
-          ) : (
-            <div className="w-6 h-6 rounded-full bg-accent/15 flex items-center justify-center flex-shrink-0 text-[10px] font-bold text-accent uppercase">
-              {deal.merchant?.charAt(0) || "M"}
-            </div>
-          )}
-
           {/* Merchant name — always a link if we can resolve an ID */}
           {resolvedMerchantId ? (
             <Link
               to={`/business/${resolvedMerchantId}`}
               onClick={(e) => e.stopPropagation()}
-              className="text-sm font-semibold text-accent uppercase tracking-wide truncate hover:underline"
+              className="text-xs text-muted-foreground truncate hover:underline"
             >
               {merchantProfile?.name || deal.merchant}
             </Link>
           ) : (
-            <span className="text-sm font-semibold text-accent uppercase tracking-wide truncate">
+            <span className="text-xs text-muted-foreground truncate">
               {deal.merchant}
             </span>
           )}
@@ -100,26 +93,26 @@ const DealCard = ({ deal, variant = "default" }: DealCardProps) => {
           </span>
         </div>
 
-        {/* Location */}
+        <h3 className="font-display font-semibold text-base text-foreground leading-tight mb-2 line-clamp-2">
+          {deal.title}
+        </h3>
+
+        {/* Location moved below title */}
         {(deal.location || merchantProfile?.location) && (
-          <div className="flex items-center gap-1 text-xs text-muted-foreground mb-2">
+          <div className="flex items-center gap-1 text-xs text-muted-foreground mb-3">
             <MapPin className="w-3 h-3" />
             <span className="truncate">{deal.location || merchantProfile?.location}</span>
           </div>
         )}
 
-        <h3 className="font-display font-semibold text-base text-foreground leading-tight mb-3 line-clamp-2">
-          {deal.title}
-        </h3>
-
         <div className="flex items-center gap-2">
-          <span className="text-xl font-bold text-foreground">
+          <span className="text-xl font-bold text-primary">
             GH₵{deal.currentPrice}
           </span>
           <span className="text-sm text-muted-foreground line-through">
             GH₵{deal.originalPrice}
           </span>
-          <span className="ml-auto text-xs font-bold bg-accent text-accent-foreground px-2 py-0.5 rounded-md">
+          <span className="ml-auto text-xs font-bold bg-discount text-discount-foreground px-2 py-0.5 rounded-md">
             -{deal.discount}%
           </span>
         </div>

@@ -22,7 +22,7 @@ function getInitials(email: string, fullName?: string) {
     return parts[0].slice(0, 2).toUpperCase();
 }
 
-const GREEN = "hsl(120 60% 41%)";
+const GREEN = "#1B5E20";
 
 const Profile = () => {
     const { user, signOut } = useAuth();

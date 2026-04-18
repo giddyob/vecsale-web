@@ -9,7 +9,7 @@ interface DealsGridProps {
 
 const DealsGrid = ({ title, deals, columns = 2 }: DealsGridProps) => {
   return (
-    <section className="py-10">
+    <section className="pt-4 pb-10">
       <div className="container">
         <div className="mb-6">
           <h2 className="text-2xl font-display font-bold text-foreground">

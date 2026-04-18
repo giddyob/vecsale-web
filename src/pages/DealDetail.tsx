@@ -88,7 +88,7 @@ const DealDetail = () => {
                     }}
                   >
                     <img src={bigSrc} alt={deal.title} className="w-full h-full object-cover transition-all duration-300" />
-                    <span className="absolute top-4 left-4 text-sm font-bold bg-accent text-accent-foreground px-3 py-1 rounded-lg">
+                    <span className="absolute top-4 left-4 text-sm font-bold bg-discount text-discount-foreground px-3 py-1 rounded-lg">
                       -{displayDiscount}% OFF
                     </span>
                   </div>
@@ -262,9 +262,9 @@ const DealDetail = () => {
                           {sub.title}
                         </h5>
                         <div className="flex items-center gap-3 mt-2">
-                          <span className="text-xl font-extrabold text-foreground">GH₵{sub.discounted_price}</span>
+                          <span className="text-xl font-extrabold text-primary">GH₵{sub.discounted_price}</span>
                           <span className="text-muted-foreground line-through text-sm">GH₵{sub.original_price}</span>
-                          <span className="text-xs font-bold bg-accent text-accent-foreground px-2 py-0.5 rounded-md ml-auto">
+                          <span className="text-xs font-bold bg-discount text-discount-foreground px-2 py-0.5 rounded-md ml-auto">
                             -{subDiscount}%
                           </span>
                         </div>
@@ -276,7 +276,7 @@ const DealDetail = () => {
             )}
 
             <div className="flex items-baseline gap-3 mb-6">
-              <span className="text-3xl font-extrabold text-foreground">GH₵{displayPrice}</span>
+              <span className="text-3xl font-extrabold text-primary">GH₵{displayPrice}</span>
               <span className="text-lg text-muted-foreground line-through">GH₵{displayOriginal}</span>
               <span className="text-sm font-semibold text-accent">Save GH₵{displayOriginal - displayPrice}</span>
             </div>

@@ -154,7 +154,7 @@ const MyStuff = () => {
 
                     {/* Price + action buttons */}
                     <div className="flex items-center justify-between mt-3 gap-2">
-                      <span className="text-sm font-bold text-foreground">
+                      <span className="text-sm font-bold text-primary">
                         GH₵{deal?.discounted_price}
                       </span>
 

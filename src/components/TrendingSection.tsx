@@ -28,7 +28,7 @@ const TrendingSection = ({ deals }: TrendingSectionProps) => {
   };
 
   return (
-    <section id="deals" className="py-10">
+    <section id="deals" className="pt-4 pb-10">
       <div className="container">
         <div className="flex items-end justify-between mb-6">
           <div>
@@ -63,7 +63,7 @@ const TrendingSection = ({ deals }: TrendingSectionProps) => {
           >
             {deals.map((deal) => (
               <div key={deal.id} className="flex-shrink-0 w-[260px]">
-                <DealCard deal={deal} />
+                <DealCard deal={deal} variant="trending" />
               </div>
             ))}
           </div>

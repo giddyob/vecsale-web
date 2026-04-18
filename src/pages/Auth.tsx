@@ -48,7 +48,7 @@ const Auth = () => {
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      <div className="container py-10 flex justify-center">
+      <div className="container pt-4 pb-10 flex justify-center">
         <div className="w-full max-w-md">
           <Link to="/" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mb-6">
             <ArrowLeft className="w-4 h-4" /> Back to home

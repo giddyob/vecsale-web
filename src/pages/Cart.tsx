@@ -43,7 +43,7 @@ const Cart = () => {
                           <Plus className="w-3 h-3" />
                         </button>
                       </div>
-                      <span className="text-sm font-bold text-foreground">GH₵{item.currentPrice * item.qty}</span>
+                      <span className="text-sm font-bold text-primary">GH₵{item.currentPrice * item.qty}</span>
                       <button onClick={() => removeItem(item.id, item.optionId)} className="text-muted-foreground hover:text-destructive transition-colors">
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -55,10 +55,10 @@ const Cart = () => {
 
             <div className="bg-card rounded-xl p-6 mt-6" style={{ boxShadow: "var(--shadow-card)" }}>
               <div className="flex justify-between text-sm text-muted-foreground mb-2">
-                <span>Subtotal</span><span>GH₵{total}</span>
+                <span>Subtotal</span><span className="font-bold text-primary">GH₵{total}</span>
               </div>
               <div className="flex justify-between font-bold text-foreground text-base pt-2 border-t border-border">
-                <span>Total</span><span>GH₵{total}</span>
+                <span>Total</span><span className="text-primary">GH₵{total}</span>
               </div>
               <Link
                 to={`/checkout?deal=${items[0]?.id}`}

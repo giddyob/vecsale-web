@@ -50,7 +50,7 @@ const NotificationDropdown = () => {
                         style={{
                             minWidth: 18,
                             height: 18,
-                            backgroundColor: "hsl(120 60% 41%)",
+                            backgroundColor: "#1B5E20",
                             padding: "0 4px",
                         }}
                     >
@@ -75,7 +75,7 @@ const NotificationDropdown = () => {
                             {notifications.length > 0 && (
                                 <span
                                     className="text-white text-[10px] font-bold rounded-full px-1.5 py-0.5"
-                                    style={{ backgroundColor: "hsl(120 60% 41%)" }}
+                                    style={{ backgroundColor: "#1B5E20" }}
                                 >
                                     {notifications.length}
                                 </span>
@@ -98,9 +98,9 @@ const NotificationDropdown = () => {
                             <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
                                 <div
                                     className="w-14 h-14 rounded-full flex items-center justify-center mb-3"
-                                    style={{ backgroundColor: "hsl(120 60% 41% / 0.1)" }}
+                                    style={{ backgroundColor: "rgba(27, 94, 32, 0.1)" }}
                                 >
-                                    <Bell className="w-6 h-6" style={{ color: "hsl(120 60% 41%)" }} />
+                                    <Bell className="w-6 h-6" style={{ color: "#1B5E20" }} />
                                 </div>
                                 <p className="text-sm font-semibold text-foreground">You're all caught up!</p>
                                 <p className="text-xs text-muted-foreground mt-1">New deals will appear here.</p>
@@ -123,7 +123,7 @@ const NotificationDropdown = () => {
                                         />
                                         <span
                                             className="absolute -top-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center"
-                                            style={{ backgroundColor: "hsl(120 60% 41%)" }}
+                                            style={{ backgroundColor: "#1B5E20" }}
                                         >
                                             <Tag className="w-2.5 h-2.5 text-white" />
                                         </span>
@@ -138,14 +138,14 @@ const NotificationDropdown = () => {
                                         <div className="flex items-center gap-2 mt-1">
                                             <span
                                                 className="text-xs font-bold"
-                                                style={{ color: "hsl(120 60% 41%)" }}
+                                                style={{ color: "#1B5E20" }}
                                             >
                                                 GH₵{n.discountedPrice}
                                             </span>
                                             {n.discountPercentage > 0 && (
                                                 <span
                                                     className="text-[10px] font-bold text-white rounded px-1 py-0.5"
-                                                    style={{ backgroundColor: "hsl(120 60% 41%)" }}
+                                                    style={{ backgroundColor: "#E65100" }}
                                                 >
                                                     -{n.discountPercentage}%
                                                 </span>
@@ -169,7 +169,7 @@ const NotificationDropdown = () => {
                                             to={`/deal/${n.dealId}`}
                                             onClick={() => setOpen(false)}
                                             className="text-[10px] font-bold px-2 py-0.5 rounded transition-opacity hover:opacity-80 text-white"
-                                            style={{ backgroundColor: "hsl(120 60% 41%)" }}
+                                            style={{ backgroundColor: "#1B5E20" }}
                                         >
                                             View
                                         </Link>
