@@ -61,7 +61,7 @@ const Cart = () => {
                 <span>Total</span><span className="text-primary">GH₵{total}</span>
               </div>
               <Link
-                to={`/checkout?deal=${items[0]?.id}`}
+                to={`/checkout?deal=${items[0]?.id}${items[0]?.optionId ? `&sub=${items[0].optionId}` : ""}`}
                 className="w-full mt-4 inline-flex items-center justify-center gap-2 px-6 py-3 text-sm font-bold bg-accent text-accent-foreground rounded-lg hover:opacity-90 transition-opacity"
               >
                 Proceed to Checkout

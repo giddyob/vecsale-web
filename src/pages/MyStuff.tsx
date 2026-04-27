@@ -4,7 +4,7 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { collection, query, where, getDocs, orderBy, deleteDoc, doc, getDoc } from "firebase/firestore";
+import { collection, query, where, getDocs, deleteDoc, doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -18,29 +18,70 @@ const MyStuff = () => {
     queryKey: ["my-coupons", user?.uid],
     enabled: !!user,
     queryFn: async () => {
+      // NOTE: combining where() + orderBy() on different fields requires a
+      // Firestore composite index. Sort client-side to avoid that requirement.
       const q = query(
         collection(db, "coupons"),
-        where("userId", "==", user!.uid),
-        orderBy("createdAt", "desc")
+        where("user_id", "==", user!.uid)
       );
       const snapshot = await getDocs(q);
       
+      // Pre-fetch all merchants for name-based fallback (same as useDeals.ts)
+      const merchantsSnap = await getDocs(collection(db, "merchants"));
+      const merchantNameMap: Record<string, { id: string; data: any }> = {};
+      const merchantIdMap: Record<string, any> = {};
+      merchantsSnap.forEach((mDoc) => {
+        const mData = mDoc.data();
+        merchantIdMap[mDoc.id] = mData;
+        if (mData.name) merchantNameMap[mData.name.toLowerCase().trim()] = { id: mDoc.id, data: mData };
+      });
+
       const couponsData = await Promise.all(
         snapshot.docs.map(async (docSnap) => {
           const coupon = { id: docSnap.id, ...docSnap.data() } as any;
-          
-          if (coupon.dealId) {
-            const dealRef = doc(db, "deals", coupon.dealId);
+
+          // Prefer the deal_snapshot stored directly on the coupon (new flow)
+          if (coupon.deal_snapshot && coupon.deal_snapshot.title) {
+            coupon.deals = {
+              title: coupon.deal_snapshot.title,
+              image_url: coupon.deal_snapshot.image_url,
+              discounted_price: coupon.deal_snapshot.discounted_price,
+              location: coupon.deal_snapshot.location,
+              businesses: {
+                name: coupon.deal_snapshot.business_name || coupon.business_name || "Local Merchant",
+              },
+            };
+          } else if (coupon.deal_id) {
+            // Fallback for older coupons without a snapshot
+            const dealRef = doc(db, "deals", coupon.deal_id);
             const dealSnap = await getDoc(dealRef);
             if (dealSnap.exists()) {
               const dealData = dealSnap.data();
-              // Try to find the merchant name
+
+              // Robust merchant resolution (mirrors useDeals.ts logic)
               let merchantName = "Local Merchant";
-              if (dealData.business_id || dealData.merchant_id) {
-                const merchantRef = doc(db, "merchants", dealData.business_id || dealData.merchant_id);
-                const merchantSnap = await getDoc(merchantRef);
-                if (merchantSnap.exists()) {
-                  merchantName = merchantSnap.data().name;
+              const getStrId = (val: any) => typeof val === "string" ? val : val?.id || val?.path?.split("/")?.pop();
+              let refId = getStrId(dealData.merchantId) ||
+                          getStrId(dealData.merchants) ||
+                          getStrId(dealData.merchant_id) ||
+                          getStrId(dealData.merchants_id) ||
+                          getStrId(dealData.business_id) ||
+                          getStrId(dealData.businesses);
+
+              // merchant field might hold an ID instead of a name
+              if (!refId && typeof dealData.merchant === "string" && !dealData.merchant.includes(" ") && dealData.merchant.length >= 8) {
+                refId = dealData.merchant;
+              }
+
+              if (refId && merchantIdMap[refId]) {
+                merchantName = merchantIdMap[refId].name || merchantName;
+              } else {
+                // Name-based fallback
+                const nameKey = (dealData.merchant || dealData.merchants?.name || dealData.businesses?.name || "").toLowerCase().trim();
+                if (nameKey && merchantNameMap[nameKey]) {
+                  merchantName = merchantNameMap[nameKey].data.name;
+                } else if (dealData.merchant) {
+                  merchantName = dealData.merchant;
                 }
               }
 
@@ -56,7 +97,14 @@ const MyStuff = () => {
           return coupon;
         })
       );
-      
+
+      // Sort descending by purchase_date client-side
+      couponsData.sort((a: any, b: any) => {
+        const aDate = a.purchase_date?.toMillis?.() ?? 0;
+        const bDate = b.purchase_date?.toMillis?.() ?? 0;
+        return bDate - aDate;
+      });
+
       return couponsData;
     },
   });
@@ -108,8 +156,8 @@ const MyStuff = () => {
           <div className="space-y-4">
             {coupons.map((coupon: any) => {
               const deal = coupon.deals;
-              const status = (coupon.status || "UNUSED") as "USED" | "UNUSED" | "EXPIRED";
-              const isUsed = status === "USED";
+              const status = (coupon.status || "unused") as "used" | "unused" | "expired";
+              const isUsed = status === "used";
 
               return (
                 <div
@@ -143,7 +191,7 @@ const MyStuff = () => {
                         ) : (
                           <Clock className="w-3 h-3" />
                         )}
-                        {isUsed ? "USED" : "UNUSED"}
+                        {isUsed ? "USED" : "ACTIVE"}
                       </span>
                     </div>
 

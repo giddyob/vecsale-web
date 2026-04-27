@@ -108,42 +108,131 @@ export const paystackWebhook = onRequest({
     const now = admin.firestore.FieldValue.serverTimestamp();
     const amountGHS = amount / 100; // Convert pesewas → GHS
 
-    // ── 5. Save coupon to Firestore ────────────────────────────────────────
-    const couponData: Record<string, any> = {
-      userId: user_id,
-      dealId: deal_id,
-      code,
-      status: "UNUSED",
-      paystackRef: reference,
-      createdAt: now,
-    };
-    if (option_id) {
-      couponData.optionId = option_id;
+    // ── 5. Look up deal + merchant details for the coupon snapshot ─────────
+    let business_id: string | null = null;
+    let business_name: string | null = null;
+    let dealSnapshot: Record<string, any> = {};
+    try {
+      const dealSnap = await db.collection("deals").doc(deal_id).get();
+      if (dealSnap.exists) {
+        const dealData = dealSnap.data()!;
+
+        // Build a snapshot of the deal at purchase time
+        dealSnapshot = {
+          title: dealData.title || null,
+          image_url: dealData.image_url || null,
+          discounted_price: dealData.discounted_price ?? null,
+          original_price: dealData.original_price ?? null,
+          location: dealData.location || null,
+          description: dealData.description || null,
+          expiry_date: dealData.expiry_date || null,
+          category: dealData.category || null,
+        };
+
+        // Robust merchant ID resolution — check all possible fields
+        const getStrId = (val: any) => typeof val === "string" ? val : val?.id || null;
+        let refId = getStrId(dealData.merchantId) ||
+                    getStrId(dealData.merchants) ||
+                    getStrId(dealData.merchant_id) ||
+                    getStrId(dealData.merchants_id) ||
+                    getStrId(dealData.business_id) ||
+                    getStrId(dealData.businesses);
+
+        // merchant field might hold an ID instead of a name
+        if (!refId && typeof dealData.merchant === "string" &&
+            !dealData.merchant.includes(" ") && dealData.merchant.length >= 8) {
+          refId = dealData.merchant;
+        }
+
+        business_id = refId || null;
+
+        // Resolve business/merchant details from merchants collection
+        if (business_id) {
+          try {
+            const merchantSnap = await db.collection("merchants").doc(business_id).get();
+            if (merchantSnap.exists) {
+              const merchantData = merchantSnap.data()!;
+              business_name = merchantData.name || null;
+              dealSnapshot.business_name = business_name;
+              dealSnapshot.business_logo = merchantData.logo || merchantData.avatarUrl || null;
+              dealSnapshot.business_location = merchantData.location || null;
+              dealSnapshot.business_phone = merchantData.phone || null;
+            }
+          } catch (merchantErr) {
+            logger.warn("Could not fetch merchant for business_name:", merchantErr);
+          }
+        }
+
+        // If no merchant found by ID, try name-based lookup
+        if (!business_name) {
+          const nameStr = dealData.merchant || dealData.merchants?.name || dealData.businesses?.name;
+          if (nameStr && typeof nameStr === "string") {
+            try {
+              const allMerchants = await db.collection("merchants").get();
+              for (const mDoc of allMerchants.docs) {
+                const mData = mDoc.data();
+                if (mData.name && mData.name.toLowerCase().trim() === nameStr.toLowerCase().trim()) {
+                  business_id = mDoc.id;
+                  business_name = mData.name;
+                  dealSnapshot.business_name = business_name;
+                  dealSnapshot.business_logo = mData.logo || mData.avatarUrl || null;
+                  dealSnapshot.business_location = mData.location || null;
+                  dealSnapshot.business_phone = mData.phone || null;
+                  break;
+                }
+              }
+            } catch (nameErr) {
+              logger.warn("Could not do name-based merchant lookup:", nameErr);
+            }
+          }
+        }
+
+        // Last resort: use the merchant string from the deal as the name
+        if (!business_name) {
+          business_name = dealData.merchant || null;
+          dealSnapshot.business_name = business_name;
+        }
+      }
+    } catch (dealErr) {
+      logger.warn("Could not fetch deal for business_id:", dealErr);
     }
+
+    // ── 6. Save coupon to Firestore ────────────────────────────────────────
+    const couponData: Record<string, any> = {
+      user_id,
+      deal_id,
+      code,
+      status: "unused",
+      paystackRef: reference,
+      purchase_date: now,
+      deal_snapshot: dealSnapshot,
+    };
+    if (option_id) couponData.option_id = option_id;
+    if (business_id) couponData.business_id = business_id;
+    if (business_name) couponData.business_name = business_name;
 
     const couponRef = await db.collection("coupons").add(couponData);
     logger.info("Coupon created:", couponRef.id, code);
 
-    // ── 6. Save transaction to Firestore ───────────────────────────────────
+    // ── 7. Save transaction to Firestore ───────────────────────────────────
     const txData: Record<string, any> = {
-      userId: user_id,
-      dealId: deal_id,
+      user_id,
+      deal_id,
       type: "purchase",
       amount: amountGHS,
       currency: "GHS",
       status: "completed",
       description: `Deal purchase — ${code}`,
       paystackRef: reference,
-      createdAt: now,
+      purchase_date: now,
     };
-    if (option_id) {
-      txData.optionId = option_id;
-    }
+    if (option_id) txData.option_id = option_id;
+    if (business_id) txData.business_id = business_id;
 
     const txRef = await db.collection("transactions").add(txData);
     logger.info("Transaction created:", txRef.id);
 
-    // ── 7. Increment deal salesCount (atomic) ──────────────────────────────
+    // ── 8. Increment deal salesCount (atomic) ──────────────────────────────
     try {
       const dealRef = db.collection("deals").doc(deal_id);
       await dealRef.update({
@@ -158,6 +247,7 @@ export const paystackWebhook = onRequest({
       code,
       deal_id,
       user_id,
+      business_id,
     });
 
     res.status(200).send("OK");
@@ -294,6 +384,238 @@ export const initializePayment = onRequest({
     });
   } catch (err: any) {
     logger.error("initializePayment error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ─── Verify Payment & Create Coupon (frontend-triggered, no webhook needed) ───
+export const verifyPayment = onRequest({
+  cors: true,
+}, async (req, res) => {
+  if (req.method !== "POST") {
+    res.status(405).send("Method Not Allowed");
+    return;
+  }
+
+  try {
+    // ── 1. Verify Firebase ID token ────────────────────────────────────────
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith("Bearer ")) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+    const idToken = authHeader.replace("Bearer ", "").trim();
+    let decodedToken;
+    try {
+      decodedToken = await admin.auth().verifyIdToken(idToken);
+    } catch {
+      res.status(401).json({ error: "Invalid token" });
+      return;
+    }
+    const uid = decodedToken.uid;
+
+    // ── 2. Get reference ───────────────────────────────────────────────────
+    const { reference } = req.body as { reference: string };
+    if (!reference) {
+      res.status(400).json({ error: "reference is required" });
+      return;
+    }
+
+    // ── 3. Idempotency: return existing coupon if already created ──────────
+    const existing = await db
+      .collection("coupons")
+      .where("paystackRef", "==", reference)
+      .limit(1)
+      .get();
+    if (!existing.empty) {
+      const doc = existing.docs[0];
+      logger.info("Returning existing coupon for reference:", reference);
+      res.status(200).json({ success: true, coupon: { id: doc.id, code: doc.data().code } });
+      return;
+    }
+
+    // ── 4. Verify transaction with Paystack ────────────────────────────────
+    const paystackSecret = paystackSecretKey.value();
+    const verifyRes = await fetch(
+      `https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`,
+      { headers: { Authorization: `Bearer ${paystackSecret}` } }
+    );
+    const verifyData = await verifyRes.json() as any;
+
+    if (!verifyData.status || verifyData.data?.status !== "success") {
+      logger.warn("Payment not successful:", verifyData.data?.status);
+      res.status(400).json({ error: "Payment not successful", status: verifyData.data?.status });
+      return;
+    }
+
+    const { metadata, amount } = verifyData.data as {
+      metadata: Record<string, any>;
+      amount: number;
+    };
+
+    // ── 5. Extract metadata ────────────────────────────────────────────────
+    let deal_id: string | undefined = metadata?.deal_id;
+    let option_id: string | undefined = metadata?.option_id;
+    let user_id: string | undefined = metadata?.user_id;
+
+    if (!deal_id && metadata?.custom_fields) {
+      for (const field of metadata.custom_fields) {
+        if (field.variable_name === "deal_id") deal_id = field.value;
+        if (field.variable_name === "option_id") option_id = field.value;
+        if (field.variable_name === "user_id") user_id = field.value;
+      }
+    }
+
+    if (!deal_id || !user_id) {
+      res.status(400).json({ error: "Missing deal_id or user_id in metadata" });
+      return;
+    }
+
+    // ── Security: requesting user must match the paying user ───────────────
+    if (user_id !== uid) {
+      res.status(403).json({ error: "Forbidden" });
+      return;
+    }
+
+    // ── 6. Look up deal + merchant details for the coupon snapshot ─────────
+    let business_id: string | null = null;
+    let business_name: string | null = null;
+    let dealSnapshot: Record<string, any> = {};
+    try {
+      const dealSnap = await db.collection("deals").doc(deal_id).get();
+      if (dealSnap.exists) {
+        const dealData = dealSnap.data()!;
+
+        // Build a snapshot of the deal at purchase time
+        dealSnapshot = {
+          title: dealData.title || null,
+          image_url: dealData.image_url || null,
+          discounted_price: dealData.discounted_price ?? null,
+          original_price: dealData.original_price ?? null,
+          location: dealData.location || null,
+          description: dealData.description || null,
+          expiry_date: dealData.expiry_date || null,
+          category: dealData.category || null,
+        };
+
+        // Robust merchant ID resolution — check all possible fields
+        const getStrId = (val: any) => typeof val === "string" ? val : val?.id || null;
+        let refId = getStrId(dealData.merchantId) ||
+                    getStrId(dealData.merchants) ||
+                    getStrId(dealData.merchant_id) ||
+                    getStrId(dealData.merchants_id) ||
+                    getStrId(dealData.business_id) ||
+                    getStrId(dealData.businesses);
+
+        // merchant field might hold an ID instead of a name
+        if (!refId && typeof dealData.merchant === "string" &&
+            !dealData.merchant.includes(" ") && dealData.merchant.length >= 8) {
+          refId = dealData.merchant;
+        }
+
+        business_id = refId || null;
+
+        // Resolve business/merchant details from merchants collection
+        if (business_id) {
+          try {
+            const merchantSnap = await db.collection("merchants").doc(business_id).get();
+            if (merchantSnap.exists) {
+              const merchantData = merchantSnap.data()!;
+              business_name = merchantData.name || null;
+              dealSnapshot.business_name = business_name;
+              dealSnapshot.business_logo = merchantData.logo || merchantData.avatarUrl || null;
+              dealSnapshot.business_location = merchantData.location || null;
+              dealSnapshot.business_phone = merchantData.phone || null;
+            }
+          } catch (merchantErr) {
+            logger.warn("Could not fetch merchant for business_name:", merchantErr);
+          }
+        }
+
+        // If no merchant found by ID, try name-based lookup
+        if (!business_name) {
+          const nameStr = dealData.merchant || dealData.merchants?.name || dealData.businesses?.name;
+          if (nameStr && typeof nameStr === "string") {
+            try {
+              const allMerchants = await db.collection("merchants").get();
+              for (const mDoc of allMerchants.docs) {
+                const mData = mDoc.data();
+                if (mData.name && mData.name.toLowerCase().trim() === nameStr.toLowerCase().trim()) {
+                  business_id = mDoc.id;
+                  business_name = mData.name;
+                  dealSnapshot.business_name = business_name;
+                  dealSnapshot.business_logo = mData.logo || mData.avatarUrl || null;
+                  dealSnapshot.business_location = mData.location || null;
+                  dealSnapshot.business_phone = mData.phone || null;
+                  break;
+                }
+              }
+            } catch (nameErr) {
+              logger.warn("Could not do name-based merchant lookup:", nameErr);
+            }
+          }
+        }
+
+        // Last resort: use the merchant string from the deal as the name
+        if (!business_name) {
+          business_name = dealData.merchant || null;
+          dealSnapshot.business_name = business_name;
+        }
+      }
+    } catch (e) {
+      logger.warn("Could not fetch deal for business_id:", e);
+    }
+
+    const code = `VS-${reference.slice(-8).toUpperCase()}`;
+    const now = admin.firestore.FieldValue.serverTimestamp();
+    const amountGHS = amount / 100;
+
+    // ── 7. Save coupon ─────────────────────────────────────────────────────
+    const couponData: Record<string, any> = {
+      user_id,
+      deal_id,
+      code,
+      status: "unused",
+      paystackRef: reference,
+      purchase_date: now,
+      deal_snapshot: dealSnapshot,
+    };
+    if (option_id) couponData.option_id = option_id;
+    if (business_id) couponData.business_id = business_id;
+    if (business_name) couponData.business_name = business_name;
+
+    const couponRef = await db.collection("coupons").add(couponData);
+    logger.info("Coupon created via verifyPayment:", couponRef.id, code);
+
+    // ── 8. Save transaction ────────────────────────────────────────────────
+    const txData: Record<string, any> = {
+      user_id,
+      deal_id,
+      type: "purchase",
+      amount: amountGHS,
+      currency: "GHS",
+      status: "completed",
+      description: `Deal purchase — ${code}`,
+      paystackRef: reference,
+      purchase_date: now,
+    };
+    if (option_id) txData.option_id = option_id;
+    if (business_id) txData.business_id = business_id;
+
+    await db.collection("transactions").add(txData);
+
+    // ── 9. Increment salesCount ────────────────────────────────────────────
+    try {
+      await db.collection("deals").doc(deal_id).update({
+        salesCount: admin.firestore.FieldValue.increment(1),
+      });
+    } catch (e) {
+      logger.warn("Could not increment salesCount:", e);
+    }
+
+    res.status(200).json({ success: true, coupon: { id: couponRef.id, code } });
+  } catch (err: any) {
+    logger.error("verifyPayment error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });
