@@ -5,6 +5,7 @@ import { categories, categoryIconNames } from "@/data/deals";
 import { useState, useRef, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCart } from "@/contexts/CartContext";
+import { useFavorites } from "@/hooks/useFavorites";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import vecsaleLogo from "@/assets/vecsale_Logo__mobile_view.png";
 import vecsaleLogoDesktop from "@/assets/vecsale-logo.png";
@@ -108,6 +109,8 @@ const Header = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const { user, signOut } = useAuth();
   const { itemCount } = useCart();
+  const { data: favIds = [] } = useFavorites();
+  const favCount = favIds.length;
   const navigate = useNavigate();
 
   const handleSignOut = async () => {
@@ -266,23 +269,32 @@ const Header = () => {
             </div>
           </form>
 
+          {/* Right-side icon cluster — all icons share the same flex row and baseline */}
           <div className="flex items-center gap-4">
-            {/* Notifications */}
-            <NotificationDropdown />
+            {/* Notifications — wrapped in a flex container so the bell aligns
+                on the same baseline as the heart and cart icons */}
+            <div className="flex items-center">
+              <NotificationDropdown />
+            </div>
 
-            {/* Favourites */}
-            <Link to="/favourites" className="text-black hover:text-black/70 transition-colors">
+            {/* Favourites with count badge */}
+            <Link to="/favourites" className="relative text-black hover:text-black/70 transition-colors">
               <Heart className="w-6 h-6" />
+              {favCount > 0 && (
+                <span className="absolute -top-2 -right-2 bg-accent text-accent-foreground text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                  {favCount > 99 ? "99+" : favCount}
+                </span>
+              )}
             </Link>
 
             {/* Cart */}
             <Link to="/cart" className="relative text-black hover:text-black/70 transition-colors">
               <ShoppingCart className="w-6 h-6" />
-              {itemCount > 0 &&
+              {itemCount > 0 && (
                 <span className="absolute -top-2 -right-2 bg-accent text-accent-foreground text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
                   {itemCount}
                 </span>
-              }
+              )}
             </Link>
 
             {/* Profile avatar / dropdown */}
