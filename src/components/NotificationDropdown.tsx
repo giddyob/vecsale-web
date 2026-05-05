@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { Bell, X, Tag, ShoppingBag, Trash2 } from "lucide-react";
+import { Bell, X, Tag, Lock, Trash2 } from "lucide-react";
 import { useNotifications } from "@/hooks/useNotifications";
+import { useAuth } from "@/contexts/AuthContext";
 
 function timeAgo(dateStr: string): string {
     const diff = Date.now() - new Date(dateStr).getTime();
@@ -17,6 +18,7 @@ function timeAgo(dateStr: string): string {
 const NotificationDropdown = () => {
     const [open, setOpen] = useState(false);
     const ref = useRef<HTMLDivElement>(null);
+    const { user } = useAuth();
     const { notifications, unreadCount, markAllSeen, dismiss, dismissAll } = useNotifications();
 
     // Mark all as seen when dropdown opens
@@ -44,7 +46,8 @@ const NotificationDropdown = () => {
                 aria-label="Notifications"
             >
                 <Bell className="w-6 h-6" />
-                {unreadCount > 0 && (
+                {/* Only show badge for authenticated users with unread notifications */}
+                {user && unreadCount > 0 && (
                     <span
                         className="absolute -top-2 -right-2 text-white text-[10px] font-bold rounded-full flex items-center justify-center"
                         style={{
@@ -94,7 +97,30 @@ const NotificationDropdown = () => {
 
                     {/* List */}
                     <div className="overflow-y-auto flex-1">
-                        {notifications.length === 0 ? (
+                        {/* Guest state — not signed in */}
+                        {!user ? (
+                            <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+                                <div
+                                    className="w-14 h-14 rounded-full flex items-center justify-center mb-3"
+                                    style={{ backgroundColor: "rgba(27, 94, 32, 0.1)" }}
+                                >
+                                    <Lock className="w-6 h-6" style={{ color: "#1B5E20" }} />
+                                </div>
+                                <p className="text-sm font-semibold text-foreground">Sign in to see deals</p>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                    Create a free account to get notified about the latest local deals.
+                                </p>
+                                <Link
+                                    to="/auth"
+                                    onClick={() => setOpen(false)}
+                                    className="mt-4 text-xs font-bold px-4 py-1.5 rounded-full text-white transition-opacity hover:opacity-80"
+                                    style={{ backgroundColor: "#1B5E20" }}
+                                >
+                                    Sign In / Register
+                                </Link>
+                            </div>
+                        ) : notifications.length === 0 ? (
+                            /* Authenticated but no new notifications yet */
                             <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
                                 <div
                                     className="w-14 h-14 rounded-full flex items-center justify-center mb-3"
@@ -106,6 +132,7 @@ const NotificationDropdown = () => {
                                 <p className="text-xs text-muted-foreground mt-1">New deals will appear here.</p>
                             </div>
                         ) : (
+                            /* Authenticated with notifications */
                             notifications.map((n) => (
                                 <div
                                     key={n.id}
@@ -179,11 +206,11 @@ const NotificationDropdown = () => {
                         )}
                     </div>
 
-                    {/* Footer */}
-                    {notifications.length > 0 && (
+                    {/* Footer — only for authenticated users with notifications */}
+                    {user && notifications.length > 0 && (
                         <div className="px-4 py-2.5 border-t border-border flex-shrink-0 text-center">
                             <p className="text-xs text-muted-foreground">
-                                Showing new deals from the last 30 days
+                                Showing new deals since you joined
                             </p>
                         </div>
                     )}

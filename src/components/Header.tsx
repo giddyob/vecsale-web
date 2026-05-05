@@ -271,8 +271,7 @@ const Header = () => {
 
           {/* Right-side icon cluster — all icons share the same flex row and baseline */}
           <div className="flex items-center gap-4">
-            {/* Notifications — wrapped in a flex container so the bell aligns
-                on the same baseline as the heart and cart icons */}
+            {/* Notifications — bell always visible; guest state handled inside dropdown */}
             <div className="flex items-center">
               <NotificationDropdown />
             </div>

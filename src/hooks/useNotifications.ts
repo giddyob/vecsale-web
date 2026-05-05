@@ -47,9 +47,10 @@ export function useNotifications() {
     const userCreatedAt: string | null =
         (user?.metadata as any)?.creationTime ?? null;
 
-    // Fetch latest deals as notifications
+    // Fetch latest deals as notifications — only when logged in
     const { data: rawDeals = [] } = useQuery({
         queryKey: ["notifications-deals"],
+        enabled: !!user,
         queryFn: async () => {
             const since = new Date();
             since.setDate(since.getDate() - 30);
